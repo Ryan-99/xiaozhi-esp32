@@ -10,6 +10,16 @@
                 "CONFIG_SPIRAM_MODE_OCT=y",
                 "CONFIG_SPIRAM_SPEED_80M=y"
             ]
+        },
+        {
+            "name": "m5stack-stopwatch-eyepet",
+            "sdkconfig_append": [
+                "CONFIG_SPIRAM=y",
+                "CONFIG_SPIRAM_MODE_OCT=y",
+                "CONFIG_SPIRAM_SPEED_80M=y",
+                "CONFIG_EYEPET_UI=y",
+                "CONFIG_USE_AFE_WAKE_WORD=y"
+            ]
         }
     ]
 }

@@ -1,5 +1,13 @@
 menu "Xiaozhi Assistant"
 
+config EYEPET_UI
+    bool "EyePet face UI (procedural carrot face on StopWatch)"
+    default n
+    depends on BOARD_TYPE_M5STACK_STOPWATCH
+    help
+        Replace the emoji/status face with the procedural EyePet carrot face
+        (21 emotions drawn with LVGL primitives at 30fps).
+
 config OTA_URL
     string "Default OTA URL"
     default "https://api.tenclass.net/xiaozhi/ota/"

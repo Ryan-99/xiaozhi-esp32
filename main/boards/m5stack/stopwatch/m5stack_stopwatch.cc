@@ -14,6 +14,10 @@
 #include <driver/spi_master.h>
 #include <wifi_manager.h>
 
+#if CONFIG_EYEPET_UI
+#include "eyepet/face_display.h"
+#endif
+
 #define TAG "M5StackStopwatch"
 #define LCD_OPCODE_WRITE_CMD (0x02ULL)
 
@@ -87,6 +91,23 @@ public:
     }
 };
 
+#if CONFIG_EYEPET_UI
+// EyePet procedural face on the same 466x466 CO5300.
+class StopwatchFaceDisplay : public eyepet::FaceDisplay {
+ public:
+  using FaceDisplay::FaceDisplay;
+  void SetupUI() override {
+    FaceDisplay::SetupUI();
+    DisplayLockGuard lock(this);
+    lv_display_add_event_cb(display_, RoundLcdDisplay::rounder_event_cb, LV_EVENT_INVALIDATE_AREA,
+                            NULL);
+  }
+};
+using BoardLcdDisplay = StopwatchFaceDisplay;
+#else
+using BoardLcdDisplay = RoundLcdDisplay;
+#endif
+
 class StopwatchBacklight : public Backlight {
 public:
     StopwatchBacklight(esp_lcd_panel_io_handle_t panel_io, Display* display)
@@ -119,7 +140,7 @@ private:
     M5IOE1 ioe_;
     Button button1_;
     Button button2_;
-    RoundLcdDisplay* display_;
+    BoardLcdDisplay* display_;
     StopwatchBacklight* backlight_;
 
     void InitializeI2c() {
@@ -226,7 +247,7 @@ private:
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
         esp_lcd_panel_disp_on_off(panel, true);
 
-        display_ = new RoundLcdDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
+        display_ = new BoardLcdDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
                                        DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X,
                                        DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
         backlight_ = new StopwatchBacklight(panel_io, display_);
