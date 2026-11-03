@@ -488,7 +488,7 @@ static void emDelicious(Cv& c, float t) {
   closedEye(c, kEL, CLOSED_HAPPY, dy);
   closedEye(c, kER, CLOSED_HAPPY, dy);
   WavePts w = wavePts(233, 328 + dy, 1, 1, 1, 14);
-  int idx = 32 + (int)(16 * sw);
+  int idx = 16 + (int)(8 * sw);
   if (idx < 0) idx = 0;
   if (idx > WavePts::N - 1) idx = WavePts::N - 1;
   tongue(c, w.p[idx].x, w.p[idx].y, 44, 46 + (int)(6 * fabsf(cosf(t * kTAU * 0.8f))));
@@ -556,7 +556,7 @@ static void emSilly(Cv& c, float t) {
   EyeOpt or_; or_.s = 1.05f; or_.px = -6; or_.py = -6 + dy;
   drawEye(c, kER, or_);
   WavePts w = wavePts(233, 328 + dy, 1, 1, 1, 14);
-  tongue(c, w.p[44].x, w.p[44].y, 48, 56);
+  tongue(c, w.p[22].x, w.p[22].y, 48, 56);
   strokeWave(c, w, 27);
 }
 static void emConfused(Cv& c, float t) {
