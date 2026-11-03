@@ -662,6 +662,8 @@ class FaceDisplay : public SpiLcdDisplay {
       lv_obj_set_size(canvas_, LV_PCT(100), LV_PCT(100));
       lv_obj_remove_flag(canvas_, LV_OBJ_FLAG_CLICKABLE);
       lv_obj_remove_flag(canvas_, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_set_style_bg_color(canvas_, kColBg, 0);
+      lv_obj_set_style_bg_opa(canvas_, LV_OPA_COVER, 0);
       lv_obj_add_event_cb(
           canvas_,
           [](lv_event_t* e) {
@@ -693,15 +695,12 @@ class FaceDisplay : public SpiLcdDisplay {
 
   void Render() {
     if (canvas_ == nullptr) return;
-    lv_area_t band;
-    lv_obj_get_coords(canvas_, &band);
-    band.x1 += kFaceBandX; band.y1 += kFaceBandY;
-    band.x2 = band.x1 + kFaceBandW - 1;
-    band.y2 = band.y1 + kFaceBandH - 1;
-    lv_obj_invalidate_area(canvas_, &band);
+    if (!render_logged_) { render_logged_ = true; ESP_LOGI("EyePet", "render tick"); }
+    lv_obj_invalidate(canvas_);
   }
 
   void Draw(lv_layer_t* layer) {
+    if (!draw_logged_) { draw_logged_ = true; ESP_LOGI("EyePet", "draw callback fired"); }
     lv_area_t a;
     lv_obj_get_coords(canvas_, &a);
     Cv c = {layer, a.x1, a.y1};
@@ -714,6 +713,8 @@ class FaceDisplay : public SpiLcdDisplay {
   lv_timer_t* frame_timer_ = nullptr;
   int emotion_id_ = E_NEUTRAL;
   uint32_t emotion_t0_ = 0;
+  bool render_logged_ = false;
+  bool draw_logged_ = false;
 };
 
 }  // namespace eyepet
