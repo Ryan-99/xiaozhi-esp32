@@ -634,18 +634,10 @@ class FaceDisplay : public SpiLcdDisplay {
     SpiLcdDisplay::SetupUI();
     {
       DisplayLockGuard lock(this);
-      // round-glass layout: text lives in dark rounded popup pills
-      lv_obj_set_size(status_bar_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-      lv_obj_set_style_bg_color(status_bar_, kColInk, 0);
-      lv_obj_set_style_bg_opa(status_bar_, LV_OPA_70, 0);
-      lv_obj_set_style_radius(status_bar_, 24, 0);
-      lv_obj_set_style_pad_hor(status_bar_, 24, 0);
-      lv_obj_set_style_pad_ver(status_bar_, 10, 0);
-      lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 56);
-      lv_obj_set_width(status_label_, kW * 0.55);
-      lv_obj_set_width(notification_label_, kW * 0.55);
-      lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
-      lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
+      // clean face: no icon strip, no status/clock pill - the face IS the UI.
+      // chat text shows in a dark rounded bubble at the bottom, only when set.
+      if (top_bar_ != nullptr) lv_obj_add_flag(top_bar_, LV_OBJ_FLAG_HIDDEN);
+      if (status_bar_ != nullptr) lv_obj_add_flag(status_bar_, LV_OBJ_FLAG_HIDDEN);
       if (bottom_bar_ != nullptr) {
         lv_obj_align(bottom_bar_, LV_ALIGN_BOTTOM_MID, 0, -66);
         lv_obj_set_width(chat_message_label_, kW * 0.68);
@@ -654,16 +646,8 @@ class FaceDisplay : public SpiLcdDisplay {
         lv_obj_set_style_radius(bottom_bar_, 24, 0);
         lv_obj_set_style_pad_hor(bottom_bar_, 24, 0);
         lv_obj_set_style_pad_ver(bottom_bar_, 10, 0);
+        lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
       }
-      if (top_bar_ != nullptr) {
-        lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 28);
-        lv_obj_set_style_pad_top(top_bar_, 14, 0);
-      }
-      // white-on-orange theme, transparent bars
-      lv_obj_set_style_bg_opa(top_bar_, LV_OPA_TRANSP, 0);
-      lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_TRANSP, 0);
-      lv_obj_set_style_text_color(status_label_, kColWhite, 0);
-      lv_obj_set_style_text_color(notification_label_, kColWhite, 0);
       lv_obj_set_style_text_color(chat_message_label_, kColWhite, 0);
       lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
@@ -703,6 +687,14 @@ class FaceDisplay : public SpiLcdDisplay {
         status[3] >= '0' && status[3] <= '9' && status[4] >= '0' && status[4] <= '9')
       return;
     SpiLcdDisplay::SetStatus(status);
+  }
+
+  void SetChatMessage(const char* role, const char* content) override {
+    if (bottom_bar_ != nullptr) {
+      if (content && content[0]) lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+      else lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+    }
+    SpiLcdDisplay::SetChatMessage(role, content);
   }
 
   bool SetEmotion(const char* emotion) override {
