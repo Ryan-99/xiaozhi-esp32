@@ -346,3 +346,4 @@ public:
 };
 
 DECLARE_BOARD(M5StackStopwatchBoard);
+// eyepet build trigger
