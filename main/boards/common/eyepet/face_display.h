@@ -656,6 +656,11 @@ class FaceDisplay : public SpiLcdDisplay {
       lv_obj_set_style_text_color(chat_message_label_, kColWhite, 0);
       lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+      // emoji_box_ is LV_SIZE_CONTENT upstream; with the emoji label/image
+      // hidden its content collapses to zero size - size it to the full screen
+      // explicitly or the face canvas (LV_PCT 100) becomes 0x0 and never paints.
+      lv_obj_set_size(emoji_box_, kW, kW);
+      lv_obj_set_style_pad_all(emoji_box_, 0, 0);
 
       canvas_ = lv_obj_create(emoji_box_);
       lv_obj_remove_style_all(canvas_);
