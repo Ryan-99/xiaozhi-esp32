@@ -17,6 +17,7 @@
 #include "display/lcd_display.h"
 #include <esp_log.h>
 #include <cmath>
+#include <algorithm>
 #include <cstring>
 
 namespace eyepet {
@@ -107,12 +108,12 @@ static Gaze gazeF(float t, float k = 1.0f) {
 // ---------- signature wavy mouth ----------
 // two concaves + a middle arch, hooked tips curling up
 inline float sigF(float u) {
-  float v = powf(fabsf(u), 1.45f);
+  float v = powf(fabsf(u), 1.2f);
   return -cosf(kTAU * v) + 0.6f * (1 - v) * (1 - v)
          - 0.3f * sq(clampf((v - 0.82f) / 0.18f));
 }
 struct WavePts {
-  static constexpr int N = 33;
+  static constexpr int N = 65;
   lv_point_t p[N];
 };
 static WavePts wavePts(int x, int y, float w = 1.0f, float amp = 1.0f, int flip = 1,
@@ -488,7 +489,8 @@ static void emDelicious(Cv& c, float t) {
   closedEye(c, kEL, CLOSED_HAPPY, dy);
   closedEye(c, kER, CLOSED_HAPPY, dy);
   WavePts w = wavePts(233, 328 + dy, 1, 1, 1, 14);
-  int idx = 16 + (int)(8 * sw);
+  int idx = 32 + (int)(16 * sw);
+  idx = std::max(16, std::min(48, idx));
   if (idx < 0) idx = 0;
   if (idx > WavePts::N - 1) idx = WavePts::N - 1;
   tongue(c, w.p[idx].x, w.p[idx].y, 44, 46 + (int)(6 * fabsf(cosf(t * kTAU * 0.8f))));
@@ -556,7 +558,7 @@ static void emSilly(Cv& c, float t) {
   EyeOpt or_; or_.s = 1.05f; or_.px = -6; or_.py = -6 + dy;
   drawEye(c, kER, or_);
   WavePts w = wavePts(233, 328 + dy, 1, 1, 1, 14);
-  tongue(c, w.p[22].x, w.p[22].y, 48, 56);
+  tongue(c, w.p[44].x, w.p[44].y, 48, 56);
   strokeWave(c, w, 27);
 }
 static void emConfused(Cv& c, float t) {
@@ -632,17 +634,26 @@ class FaceDisplay : public SpiLcdDisplay {
     SpiLcdDisplay::SetupUI();
     {
       DisplayLockGuard lock(this);
-      // round-glass insets (same as RoundLcdDisplay)
-      lv_obj_set_style_pad_left(status_bar_, kW * 0.2, 0);
-      lv_obj_set_style_pad_right(status_bar_, kW * 0.2, 0);
+      // round-glass layout: text lives in dark rounded popup pills
+      lv_obj_set_size(status_bar_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+      lv_obj_set_style_bg_color(status_bar_, kColInk, 0);
+      lv_obj_set_style_bg_opa(status_bar_, LV_OPA_70, 0);
+      lv_obj_set_style_radius(status_bar_, 24, 0);
+      lv_obj_set_style_pad_hor(status_bar_, 24, 0);
+      lv_obj_set_style_pad_ver(status_bar_, 10, 0);
       lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 56);
-      lv_obj_set_width(status_label_, kW * 0.6);
-      lv_obj_set_width(notification_label_, kW * 0.6);
+      lv_obj_set_width(status_label_, kW * 0.55);
+      lv_obj_set_width(notification_label_, kW * 0.55);
       lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
       lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
       if (bottom_bar_ != nullptr) {
         lv_obj_align(bottom_bar_, LV_ALIGN_BOTTOM_MID, 0, -66);
-        lv_obj_set_width(chat_message_label_, kW * 0.75);
+        lv_obj_set_width(chat_message_label_, kW * 0.68);
+        lv_obj_set_style_bg_color(bottom_bar_, kColInk, 0);
+        lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_70, 0);
+        lv_obj_set_style_radius(bottom_bar_, 24, 0);
+        lv_obj_set_style_pad_hor(bottom_bar_, 24, 0);
+        lv_obj_set_style_pad_ver(bottom_bar_, 10, 0);
       }
       if (top_bar_ != nullptr) {
         lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 28);
@@ -682,6 +693,16 @@ class FaceDisplay : public SpiLcdDisplay {
           33, this);  // 30fps
       ESP_LOGI("EyePet", "face UI ready");
     }
+  }
+
+  void SetStatus(const char* status) override {
+    // LvglDisplay pushes an idle HH:MM clock through SetStatus; filter it out
+    // so the bubble only ever shows real status text.
+    if (strlen(status) == 5 && status[2] == ':' &&
+        status[0] >= '0' && status[0] <= '9' && status[1] >= '0' && status[1] <= '9' &&
+        status[3] >= '0' && status[3] <= '9' && status[4] >= '0' && status[4] <= '9')
+      return;
+    SpiLcdDisplay::SetStatus(status);
   }
 
   bool SetEmotion(const char* emotion) override {
