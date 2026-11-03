@@ -90,6 +90,11 @@ inline float hashn(float n) {
   float s = sinf(n * 12.9898f) * 43758.5453f;
   return s - floorf(s);
 }
+inline float easeOutBack(float k) {
+  const float s = 1.7f;
+  k -= 1.0f;
+  return k * k * ((s + 1.0f) * k + s) + 1.0f;
+}
 struct Gaze { float px, py; };
 static Gaze gazeF(float t, float k = 1.0f) {
   float segf = floorf(t / 1.6f), f = (t / 1.6f) - segf;
@@ -290,7 +295,7 @@ static void emNeutral(Cv& c, float t) {
   Gaze gz = gazeF(t);
   float o = blinkF(t, 3.6f);
   int dy = (int)(3 * sinf(t * kTAU / 2.6f));
-  EyeOpt o1; o1.open = o; o1.px = gz.px; o1.py = gz.py;
+  EyeOpt o1; o1.open = o; o1.px = gz.px; o1.py = gz.py + dy / 2;
   bothEyes(c, o1);
   strokeWave(c, wavePts(233, 328 + dy / 2, 1, 1, 1, 0, 0, 1.5f * sinf(t * 1.7f), t * 2), 27);
 }
@@ -458,7 +463,7 @@ static void emCool(Cv& c, float t) {
   fillRect(c, 234, 150 + gyy, 128, 98, lv_color_hex(0x141416), 40);
   seg(c, 104, 164 + gyy, 74, 156 + gyy, 10, kColInk);
   seg(c, 362, 164 + gyy, 392, 156 + gyy, 10, kColInk);
-  fillRect(c, 96, 148 + gyy, 272, 26, lv_color_hex(0xFFFFFF), (lv_opa_t)(46));
+  fillRect(c, 96, 148 + gyy, 272, 26, lv_color_hex(0xFFFFFF), 0, (lv_opa_t)(46));
   if (p > 1.0f && p < 1.7f) {
     int x = 60 + (int)((p - 1.0f) / 0.7f * 380);
     tri(c, x, 140 + gyy, x + 30, 140 + gyy, x - 18, 260 + gyy, lv_color_hex(0xFFFFFF));
