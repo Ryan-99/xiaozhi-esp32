@@ -15,8 +15,6 @@
 // ============================================================================
 
 #include "display/lcd_display.h"
-#include "application.h"
-#include "board.h"
 #include <esp_log.h>
 #include <cmath>
 #include <algorithm>
@@ -110,7 +108,7 @@ static Gaze gazeF(float t, float k = 1.0f) {
 // ---------- signature wavy mouth ----------
 // two concaves + a middle arch, hooked tips curling up
 inline float sigF(float u) {
-  float v = powf(fabsf(u), 1.0f);
+  float v = fabsf(u);
   return -cosf(kTAU * v) + 0.6f * (1 - v) * (1 - v)
          - 0.3f * sq(clampf((v - 0.82f) / 0.18f));
 }
@@ -291,8 +289,7 @@ static void sadBrows(Cv& c, int dy = 0) {
 enum Emotion : uint8_t {
   E_NEUTRAL, E_HAPPY, E_LAUGHING, E_FUNNY, E_SAD, E_ANGRY, E_CRYING, E_LOVING,
   E_EMBARRASSED, E_SURPRISED, E_SHOCKED, E_THINKING, E_WINKING, E_COOL, E_RELAXED,
-  E_DELICIOUS, E_KISSY, E_CONFIDENT, E_SLEEPY, E_SILLY, E_CONFUSED,
-  E_LISTENING, E_SPEAKING, E_COUNT
+  E_DELICIOUS, E_KISSY, E_CONFIDENT, E_SLEEPY, E_SILLY, E_CONFUSED, E_COUNT
 };
 
 static void emNeutral(Cv& c, float t) {
@@ -564,27 +561,6 @@ static void emSilly(Cv& c, float t) {
   tongue(c, w.p[44].x, w.p[44].y, 48, 56);
   strokeWave(c, w, 27);
 }
-// device is listening: eyes wide, gaze up, gentle bounce
-static void emListening(Cv& c, float t) {
-  int dy = (int)(-4 * fabsf(sinf(t * kPI)));
-  cheeks(c, 0.25f);
-  EyeOpt ol; ol.s = 1.08f; ol.ps = 0.9f; ol.px = (float)(4 * sinf(t * 1.2f)); ol.py = -14 + dy;
-  drawEye(c, kEL, ol);
-  drawEye(c, kER, ol);
-  float o = blinkF(t, 4.5f);
-  (void)o;
-  strokeWave(c, wavePts(233, 330 + dy / 2, 0.9f, 0.7f, 1, 6), 27);
-}
-// device is speaking: syllable envelope drives the wave mouth
-static void emSpeaking(Cv& c, float t) {
-  float env = 0.35f + fabsf(sinf(t * 7.5f)) * 0.5f;
-  float o = blinkF(t, 3.8f);
-  int dy = (int)(3 * sinf(t * kTAU * 1.2f));
-  Gaze gz = gazeF(t, 0.6f);
-  EyeOpt o1; o1.open = o; o1.py = gz.py * 0.4f + dy;
-  bothEyes(c, o1);
-  strokeWave(c, wavePts(233, 330 + dy / 2, 1, 0.5f + env * 1.1f, 1, 0, 0, 1.2f, t * 9), 27);
-}
 static void emConfused(Cv& c, float t) {
   float o = blinkF(t, 3.2f, 1.0f);
   EyeOpt ol; ol.px = -8; ol.py = -12; ol.open = o;
@@ -620,14 +596,12 @@ static void drawEmotion(Cv& c, int id, float t) {
     case E_SLEEPY: emSleepy(c, t); break;
     case E_SILLY: emSilly(c, t); break;
     case E_CONFUSED: emConfused(c, t); break;
-    case E_LISTENING: emListening(c, t); break;
-    case E_SPEAKING: emSpeaking(c, t); break;
     default: emNeutral(c, t); break;
   }
 }
 
 static int EmotionFor(const char* name) {
-  static const char* kKeys[] = {
+  static const char* kKeys[E_COUNT] = {
       "neutral", "happy", "laughing", "funny", "sad", "angry", "crying", "loving",
       "embarrassed", "surprised", "shocked", "thinking", "winking", "cool", "relaxed",
       "delicious", "kissy", "confident", "sleepy", "silly", "confused"};
@@ -660,35 +634,43 @@ class FaceDisplay : public SpiLcdDisplay {
     SpiLcdDisplay::SetupUI();
     {
       DisplayLockGuard lock(this);
-      // clean face: no icon strip, no status/clock pill - the face IS the UI.
-      // chat text shows in a dark rounded bubble at the bottom, only when set.
-      if (top_bar_ != nullptr) lv_obj_add_flag(top_bar_, LV_OBJ_FLAG_HIDDEN);
-      if (status_bar_ != nullptr) lv_obj_add_flag(status_bar_, LV_OBJ_FLAG_HIDDEN);
-      if (bottom_bar_ != nullptr) {
-        lv_obj_align(bottom_bar_, LV_ALIGN_BOTTOM_MID, 0, -66);
-        lv_obj_set_width(chat_message_label_, kW * 0.68);
-        lv_obj_set_style_bg_color(bottom_bar_, kColInk, 0);
-        lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_70, 0);
-        lv_obj_set_style_radius(bottom_bar_, 24, 0);
-        lv_obj_set_style_pad_hor(bottom_bar_, 24, 0);
-        lv_obj_set_style_pad_ver(bottom_bar_, 10, 0);
-        lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
-      }
       lv_obj_set_style_text_color(chat_message_label_, kColWhite, 0);
       lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+      // clean face: no icon strip, no status/clock pill - the face IS the UI.
       if (top_bar_ != nullptr) lv_obj_add_flag(top_bar_, LV_OBJ_FLAG_HIDDEN);
       if (status_bar_ != nullptr) lv_obj_add_flag(status_bar_, LV_OBJ_FLAG_HIDDEN);
       if (bottom_bar_ != nullptr) lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+      // chat bubble: dark rounded pill, shown only when a chat message
+      // arrives; the stock chat label is reparented into it (keeps its
+      // glyph-capable font for CJK text).
+      chat_pill_ = lv_obj_create(lv_scr_act());
+      lv_obj_remove_style_all(chat_pill_);
+      lv_obj_set_size(chat_pill_, (int)(kW * 0.7f), LV_SIZE_CONTENT);
+      lv_obj_align(chat_pill_, LV_ALIGN_BOTTOM_MID, 0, -70);
+      lv_obj_set_style_bg_color(chat_pill_, kColInk, 0);
+      lv_obj_set_style_bg_opa(chat_pill_, LV_OPA_70, 0);
+      lv_obj_set_style_radius(chat_pill_, 26, 0);
+      lv_obj_set_style_pad_hor(chat_pill_, 26, 0);
+      lv_obj_set_style_pad_ver(chat_pill_, 12, 0);
+      lv_obj_remove_flag(chat_pill_, LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_remove_flag(chat_pill_, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_set_parent(chat_message_label_, chat_pill_);
+      lv_obj_set_width(chat_message_label_, lv_pct(100));
+      lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_add_flag(chat_pill_, LV_OBJ_FLAG_HIDDEN);
+      // deterministic z-order: face above stock UI, bubble above face
+      lv_obj_move_foreground(emoji_box_);
+      lv_obj_move_foreground(chat_pill_);
+      // emoji_box_ is LV_SIZE_CONTENT upstream; with the emoji label/image
+      // hidden its content collapses to zero size - size it to the full screen
+      // explicitly or the face canvas (LV_PCT 100) becomes 0x0 and never paints.
+      lv_obj_set_size(emoji_box_, kW, kW);
+      lv_obj_set_style_pad_all(emoji_box_, 0, 0);
 
-      // face canvas lives on the system layer: painted above EVERY stock UI
-      // element (icon strip / status pill / notifications), so nothing bleeds
-      // through the face.
-      canvas_ = lv_obj_create(lv_layer_sys());
+      canvas_ = lv_obj_create(emoji_box_);
       lv_obj_remove_style_all(canvas_);
-      lv_obj_set_pos(canvas_, 0, 0);
-      lv_obj_set_size(canvas_, kW, kW);
+      lv_obj_set_size(canvas_, LV_PCT(100), LV_PCT(100));
       lv_obj_remove_flag(canvas_, LV_OBJ_FLAG_CLICKABLE);
       lv_obj_remove_flag(canvas_, LV_OBJ_FLAG_SCROLLABLE);
       lv_obj_set_style_bg_color(canvas_, kColBg, 0);
@@ -699,24 +681,6 @@ class FaceDisplay : public SpiLcdDisplay {
             static_cast<FaceDisplay*>(lv_event_get_user_data(e))->Draw(lv_event_get_layer(e));
           },
           LV_EVENT_DRAW_MAIN, this);
-      // chat subtitle bubble on the system layer (above the face)
-      chat_pill_ = lv_obj_create(lv_layer_sys());
-      lv_obj_remove_style_all(chat_pill_);
-      lv_obj_set_size(chat_pill_, (int)(kW * 0.68f), LV_SIZE_CONTENT);
-      lv_obj_align(chat_pill_, LV_ALIGN_BOTTOM_MID, 0, -66);
-      lv_obj_set_style_bg_color(chat_pill_, kColInk, 0);
-      lv_obj_set_style_bg_opa(chat_pill_, LV_OPA_70, 0);
-      lv_obj_set_style_radius(chat_pill_, 24, 0);
-      lv_obj_set_style_pad_hor(chat_pill_, 24, 0);
-      lv_obj_set_style_pad_ver(chat_pill_, 10, 0);
-      lv_obj_remove_flag(chat_pill_, LV_OBJ_FLAG_CLICKABLE);
-      lv_obj_remove_flag(chat_pill_, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_add_flag(chat_pill_, LV_OBJ_FLAG_HIDDEN);
-      chat_label_ = lv_label_create(chat_pill_);
-      lv_obj_set_width(chat_label_, kW * 0.68f - 48);
-      lv_label_set_long_mode(chat_label_, LV_LABEL_LONG_WRAP);
-      lv_obj_set_style_text_color(chat_label_, kColWhite, 0);
-      lv_obj_set_style_text_align(chat_label_, LV_TEXT_ALIGN_CENTER, 0);
       frame_timer_ = lv_timer_create(
           [](lv_timer_t* timer) {
             static_cast<FaceDisplay*>(lv_timer_get_user_data(timer))->Render();
@@ -736,13 +700,19 @@ class FaceDisplay : public SpiLcdDisplay {
     SpiLcdDisplay::SetStatus(status);
   }
 
+  void ShowNotification(const char* notification, int duration_ms = 3000) override {
+    (void)notification; (void)duration_ms;  // face stays clean
+  }
+  void ShowNotification(const std::string& notification, int duration_ms = 3000) override {
+    (void)notification; (void)duration_ms;
+  }
+
   void SetChatMessage(const char* role, const char* content) override {
     if (chat_pill_ != nullptr) {
       if (content && content[0]) lv_obj_remove_flag(chat_pill_, LV_OBJ_FLAG_HIDDEN);
       else lv_obj_add_flag(chat_pill_, LV_OBJ_FLAG_HIDDEN);
-      if (chat_label_) lv_label_set_text(chat_label_, content ? content : "");
-      lv_obj_invalidate(chat_pill_);
     }
+    SpiLcdDisplay::SetChatMessage(role, content);
   }
 
   bool SetEmotion(const char* emotion) override {
@@ -762,18 +732,6 @@ class FaceDisplay : public SpiLcdDisplay {
   void Render() {
     if (canvas_ == nullptr) return;
     if (!render_logged_) { render_logged_ = true; ESP_LOGI("EyePet", "render tick"); }
-    static uint32_t vol_poll = 0;
-    if (++vol_poll % 15 == 0) {
-      auto codec = Board::GetInstance().GetAudioCodec();
-      if (codec) {
-        int vol = codec->output_volume();
-        if (last_volume_ >= 0 && vol != last_volume_) {
-          volume_anim_value_ = vol;
-          volume_anim_until_ = lv_tick_get() + 1600;
-        }
-        last_volume_ = vol;
-      }
-    }
     lv_obj_invalidate(canvas_);
   }
 
@@ -784,41 +742,16 @@ class FaceDisplay : public SpiLcdDisplay {
     Cv c = {layer, a.x1, a.y1};
     fillRect(c, 0, 0, kW, kW, kColBg);
     float t = (float)(lv_tick_get() - emotion_t0_) / 1000.0f;
-    int id = emotion_id_;
-    auto device_state = Application::GetInstance().GetDeviceState();
-    if (device_state == kDeviceStateListening) id = E_LISTENING;
-    else if (device_state == kDeviceStateSpeaking && id == E_NEUTRAL) id = E_SPEAKING;
-    drawEmotion(c, id, t);
-    // volume ring on the outer diameter, animated on volume changes
-    uint32_t now_tick = lv_tick_get();
-    if (now_tick < volume_anim_until_) {
-      float fade = (float)(volume_anim_until_ - now_tick) / 1600.0f;
-      lv_draw_arc_dsc_t d;
-      lv_draw_arc_dsc_init(&d);
-      d.color = kColWhite;
-      d.opa = (lv_opa_t)(clampf(fade, 0.0f, 1.0f) * 230);
-      d.center = {kC, kC};
-      d.radius = 224;
-      d.width = 6;
-      d.rounded = 1;
-      d.start_angle = 270;
-      d.end_angle = 270.0f + (float)volume_anim_value_ * 3.6f;
-      lv_draw_arc(c.layer, &d);
-    }
+    drawEmotion(c, emotion_id_, t);
   }
 
   lv_obj_t* canvas_ = nullptr;
+  lv_obj_t* chat_pill_ = nullptr;
   lv_timer_t* frame_timer_ = nullptr;
   int emotion_id_ = E_NEUTRAL;
   uint32_t emotion_t0_ = 0;
   bool render_logged_ = false;
   bool draw_logged_ = false;
-  lv_obj_t* chat_pill_ = nullptr;
-  lv_obj_t* chat_label_ = nullptr;
-  int last_volume_ = -1;
-  uint32_t volume_anim_until_ = 0;
-  int volume_anim_value_ = 0;
-  bool chat_draw_logged_ = false;
 };
 
 }  // namespace eyepet
